@@ -24,6 +24,7 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+.python-version
 MANIFEST
 
 # PyInstaller
@@ -143,6 +144,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+uv.lock
 
 # Spyder project settings
 .spyderproject
