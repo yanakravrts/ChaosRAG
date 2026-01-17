@@ -17,6 +17,9 @@ class PDFParser:
         self.output_format = output_format
 
     def _load_pdf(self) -> fitz.Document:
+        """
+        Load the pdf file into a fitz.Document object.
+        """
         if not os.path.exists(self.pdf_path):
             raise FileNotFoundError(f"PDF file not found: {self.pdf_path}")
         if not self.pdf_path.endswith(".pdf"):
@@ -24,11 +27,17 @@ class PDFParser:
         return fitz.open(self.pdf_path)
     
     def _clean_text(self, text: str) -> str:
+        """
+        Clean the text by removing extra whitespace and newlines.
+        """
         if not text:
             return ""
         return " ".join(text.split())
 
     def _extract_image(self, doc: fitz.Document, xref: int, page_num: int, img_index: int, min_image_size: int = 2048) -> Optional[str]:
+        """
+        Extract the image from pdf file.
+        """
         base_image = doc.extract_image(xref)
         img = base_image["image"]
 
@@ -49,6 +58,9 @@ class PDFParser:
         return os.path.relpath(img_path, self.output_dir)
 
     def parse(self) -> List[Dict[str, Any]]:
+        """
+        Parse the pdf file and extract text and images.
+        """
         doc = self._load_pdf()
         data = []
         
@@ -81,13 +93,15 @@ class PDFParser:
         return data
 
     def save_data(self, data: List[Dict[str, Any]]) -> None:
+        """
+        Save the data to a file.
+        """
         os.makedirs(self.output_dir, exist_ok=True)
         
         if self.output_format == "json":
             output_path = os.path.join(self.output_dir, "parsed_data.json")
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
-            print(f"Data saved to {output_path}")
             
         elif self.output_format == "csv":
             output_path = os.path.join(self.output_dir, "parsed_data.csv")
@@ -96,28 +110,10 @@ class PDFParser:
                 writer.writerow(["page_number", "text", "images", "source"])
                 for item in data:
                     writer.writerow([item["page_number"], item["text"], str(item["images"]), item["source"]])
-            print(f"Data saved to {output_path}")
 
 
 if __name__ == "__main__":
-    # Get the script's directory and resolve paths relative to project root
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(script_dir)  # Go up one level from src/ to project root
-    
-    pdf_path = os.path.join(project_root, "data", "raw", "chaos_book.pdf")
-    output_dir = os.path.join(project_root, "data", "processed")
-    
-    print(f"Script directory: {script_dir}")
-    print(f"Project root: {project_root}")
-    print(f"Looking for PDF at: {pdf_path}")
-    print(f"PDF exists: {os.path.exists(pdf_path)}")
-    
-    try:
-        parser = PDFParser(pdf_path=pdf_path, output_dir=output_dir)
-        parsed_data = parser.parse()
-        parser.save_data(parsed_data)
-        print("Script completed successfully!")
-    except Exception as e:
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
+
+    parser = PDFParser(pdf_path="data/raw/chaos_book.pdf", output_dir="data/processed")
+    parsed_data = parser.parse()
+    parser.save_data(parsed_data)
