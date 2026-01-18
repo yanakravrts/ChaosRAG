@@ -20,4 +20,6 @@ dependencies = [
     "nbformat>=5.10.4",
     "ipykernel>=7.1.0",
     "ipywidgets>=8.1.8",
+    "streamlit>=1.53.0",
+    "sentence-transformers>=5.2.0",
 ]
