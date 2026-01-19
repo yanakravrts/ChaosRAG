@@ -1,0 +1,33 @@
+version: '3.4'
+
+services:
+# streamlit app
+  chaosrag-app:
+    build: .
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    environment:
+      - WEAVIATE_HOST=weaviate_db
+    depends_on:
+      - weaviate_db
+
+  weaviate_db:
+  # db setup
+    image: semitechnologies/weaviate:1.28.4
+    ports:
+      - "8079:8080"
+      - "50050:50051"
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      ENABLE_MODULES: '' 
+      CLUSTER_HOSTNAME: 'node1'
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+
+volumes:
+  weaviate_data:

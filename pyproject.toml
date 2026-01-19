@@ -1,13 +1,10 @@
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
-
 [tool.poetry]
 name = "chaosrag"
 version = "0.1.0"
-description = "Add your description here"
+description = "RAG application based on Chaos Theory"
+authors = ["Yana Kravets"]
 readme = "README.md"
-package-mode = false 
+package-mode = false  
 
 [tool.poetry.dependencies]
 python = ">=3.13,<4.0"
@@ -28,3 +25,7 @@ ipykernel = ">=7.1.0"
 ipywidgets = ">=8.1.8"
 streamlit = ">=1.53.0"
 sentence-transformers = ">=5.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

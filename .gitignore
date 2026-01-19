@@ -138,3 +138,5 @@ dmypy.json
 
 # PyPI configuration file
 .pypirc
+
+poetry.lock

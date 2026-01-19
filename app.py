@@ -71,9 +71,20 @@ def get_history_string(messages: List[dict], limit: int = 10) -> str:
 
 @st.cache_resource
 def get_weaviate_client():
+    weaviate_host = os.getenv("WEAVIATE_HOST", "localhost")
+    
     try:
-        return weaviate.connect_to_local(port=8079, grpc_port=50050)
-    except Exception:
+        client = weaviate.connect_to_custom(
+            http_host=weaviate_host,
+            http_port=8080,     
+            http_secure=False,
+            grpc_host=weaviate_host,
+            grpc_port=50051,    
+            grpc_secure=False
+        )
+        return client
+    except Exception as e:
+        print(f"Connection failed: {e}. Fallback to embedded.")
         return weaviate.connect_to_embedded()
 
 @st.cache_resource
