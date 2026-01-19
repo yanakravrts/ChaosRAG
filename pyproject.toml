@@ -3,7 +3,7 @@ name = "chaosrag"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.13,<4.0""
 dependencies = [
     "PyMuPDF>=1.23.0",
     "tqdm>=4.66.0",
