@@ -40,14 +40,4 @@ poetry run python src/vector_to_db.py
 ![Inference](assets/inference.png)
 
 ## Demo
-1. Image as an input 
-
-2. Text queries
-a)
-
-b)
-
-3. Equation
-
-
-4. Image as output
+![link](https://drive.google.com/drive/folders/1K7z0Pp59aC4oXuiucdpUjWLZ1BRQGRJu?usp=share_link)
