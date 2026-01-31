@@ -2,7 +2,6 @@
 name = "chaosrag"
 version = "0.1.0"
 description = "RAG application based on Chaos Theory"
-authors = ["Yana Kravets"]
 readme = "README.md"
 package-mode = false  
 
