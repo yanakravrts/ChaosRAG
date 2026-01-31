@@ -41,18 +41,13 @@ poetry run python src/vector_to_db.py
 
 ## Demo
 1. Image as an input 
-![Image as an input demo](assets/image.gif)
 
 2. Text queries
 a)
-![Text 1 demo](https://github.com/user-attachments/assets/a590cedb-9671-4902-91b1-cf830949f48e)
 
 b)
-![Text 2 demo](https://github.com/user-attachments/assets/4b871914-e755-4d18-a3c7-bef0a8cc3c31)
 
 3. Equation
 
-![Equatin demo](https://github.com/user-attachments/assets/e7e5cf7f-13f0-4e68-a519-5f983061bb5f)
 
 4. Image as output
-![Image as an output demo](assets/image_output.gif)
