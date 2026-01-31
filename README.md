@@ -39,5 +39,5 @@ poetry run python src/vector_to_db.py
 3. Inference
 ![Inference](assets/inference.png)
 
-## Demo
-![link](https://drive.google.com/drive/folders/1K7z0Pp59aC4oXuiucdpUjWLZ1BRQGRJu?usp=share_link)
+## [Demo](https://drive.google.com/drive/folders/1K7z0Pp59aC4oXuiucdpUjWLZ1BRQGRJu?usp=share_link)
+
