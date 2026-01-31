@@ -33,6 +33,25 @@ poetry run python src/vector_to_db.py
 ```
 
 ## Pipeline
+1. Data Ingestion
 ![Data Ingestion](assets/data_ingestion.png)
 
+2. Inference
 ![Inference](assets/inference.png)
+
+## Demo
+1. Image as an input 
+![Image as an input demo](assets/image.gif)
+
+2. Text queries
+a)
+![Text 1 demo](assets/text1.gif)
+
+b)
+![Text 2 demo](assets/text2.gif)
+
+3. Equation
+![Equatin demo](assets/equation.gif)
+
+4. Image as output
+![Image as an output demo](assets/image_output.gif)

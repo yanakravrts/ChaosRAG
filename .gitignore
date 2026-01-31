@@ -140,3 +140,5 @@ dmypy.json
 .pypirc
 
 poetry.lock
+
+.DS_Store
