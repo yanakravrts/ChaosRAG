@@ -142,7 +142,7 @@ def truncate(text, max_len=350):
     truncated = text[:max_len]
     return truncated.rsplit(" ", 1)[0]
 
-def hybrid_search(query: str, k: int = 10) -> List[Document]:
+def hybrid_search(query: str, k: int = 5) -> List[Document]:
     vector_store = get_vector_store()
     cross_encoder = get_cross_encoder()
     
