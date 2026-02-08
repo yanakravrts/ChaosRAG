@@ -1,7 +1,6 @@
 import fitz
 import os
 import json
-import csv
 from typing import List, Dict, Any, Optional
 from tqdm import tqdm
 
@@ -11,10 +10,9 @@ class PDFParser:
     A class to parse pdf files and extract text and images.
     """
 
-    def __init__(self, pdf_path: str, output_dir: str = "data/processed", output_format: str = "json"):
+    def __init__(self, pdf_path: str, output_dir: str = "data/processed"):
         self.pdf_path = pdf_path
         self.output_dir = output_dir
-        self.output_format = output_format
 
     def _load_pdf(self) -> fitz.Document:
         """
@@ -96,21 +94,10 @@ class PDFParser:
         """
         Save the data to a file.
         """
-        os.makedirs(self.output_dir, exist_ok=True)
-        
-        if self.output_format == "json":
-            output_path = os.path.join(self.output_dir, "parsed_data.json")
-            with open(output_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=4, ensure_ascii=False)
-            
-        elif self.output_format == "csv":
-            output_path = os.path.join(self.output_dir, "parsed_data.csv")
-            with open(output_path, "w", newline='', encoding="utf-8") as f:
-                writer = csv.writer(f)
-                writer.writerow(["page_number", "text", "images", "source"])
-                for item in data:
-                    writer.writerow([item["page_number"], item["text"], str(item["images"]), item["source"]])
-
+        os.makedirs(self.output_dir, exist_ok=True)            
+        output_path = os.path.join(self.output_dir, "parsed_data.json")
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
 
 if __name__ == "__main__":
 

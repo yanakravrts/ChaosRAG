@@ -6,10 +6,12 @@ import base64
 import pandas as pd
 import plotly.express as px
 from dotenv import load_dotenv
+from weaviate.classes.init import Auth
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.documents import Document
 from sentence_transformers import CrossEncoder
+from langchain_weaviate.vectorstores import WeaviateVectorStore
 import atexit
 from typing import List, Optional
 
@@ -71,25 +73,29 @@ def get_history_string(messages: List[dict], limit: int = 10) -> str:
 
 @st.cache_resource
 def get_weaviate_client():
-    weaviate_host = os.getenv("WEAVIATE_HOST", "localhost")
-    
-    try:
-        client = weaviate.connect_to_custom(
-            http_host=weaviate_host,
-            http_port=8080,     
-            http_secure=False,
-            grpc_host=weaviate_host,
-            grpc_port=50051,    
-            grpc_secure=False
-        )
-        return client
-    except Exception as e:
-        print(f"Connection failed: {e}. Fallback to embedded.")
-        return weaviate.connect_to_embedded()
+    weaviate_url = os.environ["WEAVIATE_URL"]
+    weaviate_api_key = os.environ["WEAVIATE_API_KEY"]
+
+    client = weaviate.connect_to_weaviate_cloud(
+        cluster_url=weaviate_url,
+        auth_credentials=Auth.api_key(weaviate_api_key),
+    )
+    return client
+
+@st.cache_resource
+def get_vector_store():
+    client = get_weaviate_client()
+    embeddings = get_embeddings_model()
+    return WeaviateVectorStore(
+        client=client,
+        index_name="ChaosKnowledgeBase",
+        embedding=embeddings,
+        text_key="text" 
+    )
 
 @st.cache_resource
 def get_embeddings_model():
-    return GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+    return GoogleGenerativeAIEmbeddings(model="gemini-embedding-001")
 
 @st.cache_resource
 def get_cross_encoder():
@@ -106,8 +112,9 @@ def is_formula_query(query: str) -> bool:
 def is_latex_content(text: str) -> bool:
     latex_indicators = [
         r'\frac', r'\sum', r'\int', r'\partial', r'\sigma', r'\rho',
-        r'\beta', r'\alpha', r'\theta', r'\Delta', '$$', '$',
-        r'\times', r'\cdot', r'\pm', r'\leq', r'\geq', r'd^2', r'dt^2'
+        r'\beta', r'\alpha', r'\theta', r'\Delta',
+        r'\times', r'\cdot', r'\pm', r'\leq', r'\geq', r'd^2', r'dt^2',
+        r'\$\$.*?\$\$'
     ]
     return any(indicator in text for indicator in latex_indicators)
 
@@ -131,83 +138,37 @@ def resolve_image_path(props: dict, metadata: dict) -> Optional[str]:
                     return path
     return None
 
-def search_formulas(query: str, collection, embeddings, k: int = 3) -> List[Document]:
-    query_vector = embeddings.embed_query(query)
-    response = collection.query.hybrid(
-        query=query,
-        vector=query_vector,
-        limit=k*3,
-        alpha=0.7,
-        return_metadata=["distance", "score"]
-    )
-    formula_docs = []
-    for obj in response.objects:
-        props = obj.properties
-        content = props.get("text", "")
-        if is_latex_content(content):
-            metadata = {
-                "page": props.get("page", 0),
-                "type": "formula",
-                "source": props.get("source", "chaos_book.pdf"),
-            }
-            if hasattr(obj, "metadata") and obj.metadata:
-                if hasattr(obj.metadata, "distance"):
-                    metadata["distance"] = obj.metadata.distance
-                if hasattr(obj.metadata, "score"):
-                    metadata["score"] = obj.metadata.score
-            formula_docs.append(Document(page_content=content, metadata=metadata))
-            if len(formula_docs) >= k:
-                break
-    return formula_docs
+def truncate(text, max_len=350):
+    truncated = text[:max_len]
+    return truncated.rsplit(" ", 1)[0]
 
-def hybrid_search(query: str, k: int = 10, alpha: float = 0.6) -> List[Document]:
-    client = get_weaviate_client()
-    embeddings = get_embeddings_model()
+def hybrid_search(query: str, k: int = 10) -> List[Document]:
+    vector_store = get_vector_store()
     cross_encoder = get_cross_encoder()
-    query_vector = embeddings.embed_query(query)
-    collection = client.collections.get("ChaosKnowledgeBase")
     
-    response = collection.query.hybrid(
-        query=query,
-        vector=query_vector,
-        limit=k,
-        alpha=alpha,
-        return_metadata=["distance", "score"]
+    candidates = vector_store.similarity_search(query, k=k*2)
+
+    keywords = re.findall(r'\w+', query.lower())
+    for doc in candidates:
+        text_lower = doc.page_content.lower()
+        keyword_matches = sum(1 for kw in keywords if kw in text_lower)
+        doc.metadata["keyword_boost"] = min(keyword_matches / len(keywords), 1.0) * 0.05
+
+        # Formula boost
+        doc.metadata["formula_boost"] = 0.15 if is_latex_content(doc.page_content) else 0.0
+
+    # rerank
+    pairs = [(query, truncate(doc.page_content)) for doc in candidates]
+    cross_scores = cross_encoder.predict(pairs)
+
+    reranked = sorted(
+        zip(cross_scores, candidates),
+        key=lambda x: 0.8 * x[0] + 0.15 * x[1].metadata.get("formula_boost", 0) + x[1].metadata.get("keyword_boost", 0),
+        reverse=True
     )
-    
-    docs = []
-    for obj in response.objects:
-        props = obj.properties
-        metadata = {
-            "page": props.get("page", 0),
-            "type": props.get("type", "text"),
-            "source": props.get("source", "chaos_book.pdf"),
-        }
-        metadata["image_path"] = resolve_image_path(props, metadata)
-        if hasattr(obj, "metadata") and obj.metadata:
-            if hasattr(obj.metadata, "distance"):
-                metadata["distance"] = obj.metadata.distance
-            if hasattr(obj.metadata, "score"):
-                metadata["score"] = obj.metadata.score
-        content = props.get("text", "")
-        docs.append(Document(page_content=content, metadata=metadata))
-    
-    # Additional formula search
-    if is_formula_query(query):
-        formula_docs = search_formulas(query, collection, embeddings)
-        existing_pages = {doc.metadata.get("page") for doc in docs}
-        for fdoc in formula_docs:
-            if fdoc.metadata.get("page") not in existing_pages:
-                docs.append(fdoc)
-    
-    # Re-rank 
-    if docs:
-        pairs = [(query, doc.page_content) for doc in docs[:10]]
-        scores = cross_encoder.predict(pairs)
-        ranked_docs = [doc for _, doc in sorted(zip(scores, docs[:10]), key=lambda x: x[0], reverse=True)]
-        return ranked_docs[:3]
-    
-    return docs[:3]
+
+    final_docs = [doc for _, doc in reranked[:k]]
+    return final_docs
 
 @st.cache_resource
 def get_llm():
@@ -382,10 +343,9 @@ def run_app():
         handle_user_input(prompt, uploaded_file)
 
 def cleanup():
-    client = get_weaviate_client()
     try:
-        if client and hasattr(client,'is_ready') and client.is_ready():
-            client.close()
+        client = get_weaviate_client()
+        client.close()
     except:
         pass
 

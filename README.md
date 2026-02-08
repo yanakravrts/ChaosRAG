@@ -17,19 +17,11 @@ https://github.com/yanakravrts/ChaosRAG.git
 3. poetry install
 ```
 
-3. Create `.env` file with your api key `GOOGLE_API_KEY`:
-```bash
-GOOGLE_API_KEY=YourApiKey
-```
+3. Create `.env` file from `.env.example`:
 
-3. Run application 
+4. Run application 
 ```bash
-# run in first terminal:
 docker-compose up --build
-
-# after you see: URL: http://0.0.0.0:8501, move to db cration
-# run in second terminal:
-poetry run python src/vector_to_db.py
 ```
 
 ## Pipeline
