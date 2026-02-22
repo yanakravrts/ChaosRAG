@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.express as px
 from dotenv import load_dotenv
 from weaviate.classes.init import Auth
+import weaviate.classes.query
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.documents import Document
@@ -38,9 +39,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def encode_image(image_file) -> str:
+    """Encode an uploaded image file into a base64 string suitable for inline transport to the LLM."""
     return base64.b64encode(image_file.getvalue()).decode("utf-8")
 
 def find_image_path(page_num: int, img_path: Optional[str] = None) -> Optional[str]:
+    """Locate an image file for a given page number, trying several possible base directories and filenames."""
     if img_path and os.path.exists(img_path):
         return img_path
     base_dirs = [
@@ -60,6 +63,7 @@ def find_image_path(page_num: int, img_path: Optional[str] = None) -> Optional[s
     return None
 
 def get_history_string(messages: List[dict], limit: int = 10) -> str:
+    """Convert last 10 chat messages into a cleaned text history string for inclusion in the system prompt."""
     chat_history_str = ""
     history_slice = messages[:-1][-limit:] if len(messages) > 1 else []
     for msg in history_slice:
@@ -73,6 +77,7 @@ def get_history_string(messages: List[dict], limit: int = 10) -> str:
 
 @st.cache_resource
 def get_weaviate_client():
+    """Create and cache a Weaviate client using environment variables for URL and API key."""
     weaviate_url = os.environ["WEAVIATE_URL"]
     weaviate_api_key = os.environ["WEAVIATE_API_KEY"]
 
@@ -84,6 +89,7 @@ def get_weaviate_client():
 
 @st.cache_resource
 def get_vector_store():
+    """Return a cached `WeaviateVectorStore` connected to the Chaos knowledge base with the embedding model."""
     client = get_weaviate_client()
     embeddings = get_embeddings_model()
     return WeaviateVectorStore(
@@ -95,13 +101,16 @@ def get_vector_store():
 
 @st.cache_resource
 def get_embeddings_model():
+    """Return the Google Generative AI embedding model used for vectorizing queries and documents."""
     return GoogleGenerativeAIEmbeddings(model="gemini-embedding-001")
 
 @st.cache_resource
 def get_cross_encoder():
+    """Return the cross-encoder model used to rerank Weaviate hybrid search results."""
     return CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
 
 def is_formula_query(query: str) -> bool:
+    """Detect whether a user query is likely asking about formulas or equations."""
     formula_keywords = [
         "equation", "formula", "formulas", "equations", 
         "mathematical", "derive", "expression", "derivation"
@@ -110,6 +119,7 @@ def is_formula_query(query: str) -> bool:
     return any(keyword in query_lower for keyword in formula_keywords)
 
 def is_latex_content(text: str) -> bool:
+    """Check whether a text snippet likely contains LaTeX-style mathematical content."""
     latex_indicators = [
         r'\frac', r'\sum', r'\int', r'\partial', r'\sigma', r'\rho',
         r'\beta', r'\alpha', r'\theta', r'\Delta',
@@ -119,6 +129,7 @@ def is_latex_content(text: str) -> bool:
     return any(indicator in text for indicator in latex_indicators)
 
 def resolve_image_path(props: dict, metadata: dict) -> Optional[str]:
+    """Resolve an image path from Weaviate object properties/metadata into a local filesystem path if possible."""
     image_path = props.get("image_path")
     if image_path:
         base_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "processed")
@@ -139,36 +150,61 @@ def resolve_image_path(props: dict, metadata: dict) -> Optional[str]:
     return None
 
 def truncate(text, max_len=350):
+    """Truncate text to `max_len` characters, cutting at the last whitespace to avoid mid-word cuts."""
     truncated = text[:max_len]
     return truncated.rsplit(" ", 1)[0]
 
 def hybrid_search(query: str, k: int = 5) -> List[Document]:
-    vector_store = get_vector_store()
+    """Run a Weaviate hybrid search, then rerank with a cross-encoder and a small formula boost, returning top-k docs."""
+    client = get_weaviate_client()
     cross_encoder = get_cross_encoder()
+    embeddings = get_embeddings_model()
     
-    candidates = vector_store.similarity_search(query, k=k*2)
+    # vectorize query
+    query_vector = embeddings.embed_query(query)
 
-    keywords = re.findall(r'\w+', query.lower())
+    # hybrid search (1/2cosine + 1/2bm25)
+    collection = client.collections.get("ChaosKnowledgeBase")
+    results = collection.query.hybrid(
+        query=query,
+        vector=query_vector,
+        limit=k*2,
+        alpha=0.5,
+        return_metadata=weaviate.classes.query.MetadataQuery(score=True)
+    )
+
+    # from weaviate objects to langchain documents
+    candidates = []
+    for obj in results.objects:
+        props = obj.properties
+        metadata = {
+            "page":         props.get("page", 0),
+            "type":         props.get("type", "text"),
+            "image_path":   props.get("image_path", ""),
+            "source":       props.get("source", ""),
+            "hybrid_score": obj.metadata.score if obj.metadata else 0.0,
+        }
+        doc = Document(
+            page_content=props.get("text", ""),
+            metadata=metadata
+        )
+        candidates.append(doc)
+
+    # formula boost
     for doc in candidates:
-        text_lower = doc.page_content.lower()
-        keyword_matches = sum(1 for kw in keywords if kw in text_lower)
-        doc.metadata["keyword_boost"] = min(keyword_matches / len(keywords), 1.0) * 0.05
-
-        # Formula boost
         doc.metadata["formula_boost"] = 0.15 if is_latex_content(doc.page_content) else 0.0
 
-    # rerank
+    # cross-encoder reranking
     pairs = [(query, truncate(doc.page_content)) for doc in candidates]
     cross_scores = cross_encoder.predict(pairs)
 
     reranked = sorted(
         zip(cross_scores, candidates),
-        key=lambda x: 0.8 * x[0] + 0.15 * x[1].metadata.get("formula_boost", 0) + x[1].metadata.get("keyword_boost", 0),
+        key=lambda x: 0.8 * x[0] + 0.15 * x[1].metadata.get("formula_boost", 0),
         reverse=True
     )
 
-    final_docs = [doc for _, doc in reranked[:k]]
-    return final_docs
+    return [doc for _, doc in reranked[:k]]
 
 @st.cache_resource
 def get_llm():
