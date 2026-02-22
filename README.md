@@ -33,3 +33,4 @@ docker-compose up --build
 
 ## [Demo](https://drive.google.com/drive/folders/1K7z0Pp59aC4oXuiucdpUjWLZ1BRQGRJu?usp=share_link)
 
+## [Deployed version](https://chaosrag-xbxglisjnvdqnusgtscmgx.streamlit.app)
