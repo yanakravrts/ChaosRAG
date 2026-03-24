@@ -1,3 +1,10 @@
+---
+layout: default
+nav_order: 1
+title: Chaos RAG
+has_children: false
+permALINK: /
+---
 # ChaosRAG: Chaos Theory Assistant
 A RAG application that allows you to interact with a knowledge base based on Edward Lorenz's book "The Essence of Chaos"
 
