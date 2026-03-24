@@ -1,10 +1,11 @@
 title: Chaos RAG
 description: A RAG application that allows you to interact with a knowledge base based on Edward Lorenz's book
 
-theme: just-the-docs/just-the-docs
+remote_theme: just-the-docs/just-the-docs
 
 plugins:
   - jekyll-relative-links
+  - jekyll-remote-theme
 
 relative_links:
   enabled: true
